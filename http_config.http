@@ -1,0 +1,117 @@
+GET http://localhost:7890/order/orders
+Accept: application/json
+
+###
+
+GET http://localhost:7890/order/114-4432044-5795461
+Accept: application/json
+
+###
+
+GET http://localhost:7890/order/item/112-9996520-6116213
+Accept: application/json
+
+###
+
+GET http://localhost:7890/finance/event
+Accept: application/json
+
+###
+
+GET http://localhost:7890/finance/event/group
+Accept: application/json
+
+###
+
+GET http://localhost:7890/catalog/categories
+Accept: application/json
+
+###
+
+GET http://localhost:7890/catalog/items
+Accept: application/json
+
+###
+
+GET http://localhost:7890/fba/inbound
+Accept: application/json
+
+###
+
+GET http://localhost:7890/fba/inventory/
+Accept: application/json
+
+###
+
+GET http://localhost:7890/finance/event/group
+Accept: application/json
+
+###
+
+GET http://localhost:7890/finance/event/order
+Accept: application/json
+
+###
+
+GET http://localhost:7890/fulfill/inbound/items
+Accept: application/json
+
+###
+
+GET http://localhost:7890/fulfill/inbound/guide
+Accept: application/json
+
+###
+
+GET http://localhost:7890/fulfill/outbound/orders
+Accept: application/json
+
+###
+
+GET http://localhost:7890/product/price
+Accept: application/json
+
+###
+
+GET http://localhost:7890/sales/metrics
+Accept: application/json
+
+###
+
+GET http://localhost:7890/report?reportType=GET_FBA_FULFILLMENT_INVENTORY_HEALTH_DATA
+Accept: application/json
+
+###
+
+GET http://localhost:7890/report/id/114215019001
+Accept: application/json
+
+###
+
+GET http://localhost:7890/schedule
+Accept: application/json
+
+###
+
+GET http://localhost:7890/report/ReportDocumentId?reportDocumentId=amzn1.spdoc.1.3.6b82637f-2e48-4882-9a68-83e6f87c954d.TQOT99T19UGDO.2612
+Accept: application/json
+
+###
+
+GET http://localhost:7890/reportgzip/ReportDocumentId?reportDocumentId=amzn1.spdoc.1.3.6b82637f-2e48-4882-9a68-83e6f87c954d.TQOT99T19UGDO.2612
+Accept: application/json
+
+###
+
+POST http://localhost:7890/createreport
+Accept: application/json
+
+###
+
+GET http://localhost:7890/catolog/A2EUQ1WTGCTBG2/502501
+Accept: application/json
+
+###
+
+GET http://localhost:7890/messaging?amazonOrderId=405-4287366-3955533&marketPlaceId=A1RKKUPIHCS9HS
+Accept: application/json

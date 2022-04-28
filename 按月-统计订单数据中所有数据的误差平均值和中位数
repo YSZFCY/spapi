@@ -1,0 +1,187 @@
+
+-- 将TD的日数据汇总为月数据
+INSERT INTO `sales_store_td_sum_month`
+( `seller_id`, `posted_date`, `totalsales`, `ordercount`, avg_price, unitcount,orderitemcount)
+SELECT
+    `seller_id`,
+    LEFT(posted_date,7) AS posted_date ,
+    SUM(`totalsales`) AS totalsales,
+    SUM(`ordercount`)  AS ordercount,
+    SUM(`avg_price`)  AS avg_price,
+    SUM(`unitcount`)  AS unitcount,
+    SUM(`orderitemcount`)  AS orderitemcount
+FROM sales_store_td_sum
+GROUP BY seller_id, LEFT(posted_date,7);
+
+
+DELETE from sales_store_info_month WHERE totalSalesCurrencyCode IN ('TRY','SEK','BRL');
+-- 第一步： 把接口取到到数据中的金额换成人民币
+UPDATE sales_store_info_month a INNER JOIN d99_frgn_cur_exrate_para_new b ON
+        a.totalSalesCurrencyCode = b.currency
+SET a.cnSalesAmoun = a.totalSalesAmount * b.exchange;
+
+UPDATE sales_store_info_month a INNER JOIN d99_frgn_cur_exrate_para_new b ON
+        a.averageUnitPriceCurrencyCode = b.currency
+SET a.cnPriceAmount = a.averageUnitPriceAmount * b.exchange
+;
+-- WHERE a.storeNo = 1;
+
+-- 第二步，把准备好的接口数据，按店铺和日期汇总数据到汇总表。
+INSERT INTO `sales_store_info_web_sum_all_month`
+(	`sellerId`,
+     `interval`,
+     `unitCount`,
+     `orderItemCount`,
+     `orderCount`,
+     `cnSalesAmoun`,
+     `cnPriceAmount`)
+SELECT
+    sellerId,
+    `interval`,
+    SUM(unitCount) AS unitCount,
+    SUM(orderItemCount) AS orderItemCount,
+    SUM(orderCount) AS orderCount,
+    SUM(cnSalesAmoun) AS cnSalesAmoun,
+    SUM(cnPriceAmount) AS cnPriceAmount
+from sales_store_info_month GROUP BY sellerId,`interval`;
+
+
+-- 第三步，将TD的汇总数据对应的放到接口汇总表中
+UPDATE sales_store_info_web_sum_all_month
+SET
+    tdunitCount = null,
+    tdorderItemCount = null,
+    tdorderCount = null,
+    tdcnSalesAmoun = null,
+    tdcnPriceAmount =  null,
+    unitCountDiff = null,
+    orderItemCountDiff = null,
+    orderCountDiff= null,
+    cnSalesAmounDiff = null,
+    cnPriceAmountDiff = null
+;
+
+UPDATE sales_store_info_web_sum_all_month a INNER JOIN sales_store_td_sum_month b ON
+            a.sellerId = b.seller_id AND a.`interval` = b.posted_date
+SET
+    a.tdunitCount = b.unitcount,
+    a.tdorderItemCount = b.orderitemcount,
+    a.tdorderCount = b.ordercount,
+    a.tdcnSalesAmoun = b.totalsales,
+    a.tdcnPriceAmount = b.avg_price
+;
+
+DELETE FROM sales_store_info_web_sum_all_month WHERE tdorderCount is null and tdcnSalesAmoun is null;
+
+-- 第四步，将第三步得到的数据计算误差值
+
+UPDATE sales_store_info_web_sum_all_month SET unitCountDiff = (unitCount - tdunitCount) / tdunitCount ;
+UPDATE sales_store_info_web_sum_all_month SET orderItemCountDiff = (orderItemCount - tdorderItemCount) / tdorderItemCount ;
+UPDATE sales_store_info_web_sum_all_month SET orderCountDiff = (orderCount - tdorderCount) / tdorderCount ;
+
+UPDATE sales_store_info_web_sum_all_month SET cnPriceAmountDiff = CAST((cnPriceAmount - tdcnPriceAmount) / tdcnPriceAmount as decimal(10,5));
+UPDATE sales_store_info_web_sum_all_month SET cnSalesAmounDiff = CAST((cnSalesAmoun - tdcnSalesAmoun) / tdcnSalesAmoun as decimal(10,5));
+
+-- --------------------
+
+SELECT count(1) from sales_store_info_web_sum_all_month WHERE tdorderCount is null;
+SELECT count(1) from sales_store_info_web_sum_all_month WHERE tdcnSalesAmoun is null;
+
+SELECT count(1) from sales_store_info_web_sum_all_month WHERE orderCountDiff is null;
+SELECT count(1) from sales_store_info_web_sum_all_month WHERE cnSalesAmounDiff is null;
+
+SELECT * from sales_store_info_web_sum_all_month WHERE orderCountDiff is not null and cnSalesAmounDiff is null;
+
+
+
+-- 平均数取四个，为正的平均数，为负的平均数，绝对值的平均数，所有数据直接加起来的平均数
+-- 为正的平均数
+SELECT SUM(unitCountDiff) / COUNT(1) AS '订单单元数正数平均数' from  sales_store_info_web_sum_all_month WHERE unitCountDiff >= 0;
+SELECT SUM(unitCountDiff) / COUNT(1) AS '订单单元数负数平均数' from  sales_store_info_web_sum_all_month WHERE unitCountDiff < 0;
+SELECT SUM(ABS(unitCountDiff)) / COUNT(1) AS '订单单元数绝对值平均数' from  sales_store_info_web_sum_all_month WHERE unitCountDiff is not null;
+SELECT SUM(unitCountDiff) / COUNT(1) AS '订单单元数直接相加平均数' from  sales_store_info_web_sum_all_month WHERE unitCountDiff is not null;
+
+SELECT SUM(orderItemCountDiff) / COUNT(1) AS '订单项目数正数平均数' from  sales_store_info_web_sum_all_month WHERE orderItemCountDiff >= 0;
+SELECT SUM(orderItemCountDiff) / COUNT(1) AS '订单项目数负数平均数' from  sales_store_info_web_sum_all_month WHERE orderItemCountDiff < 0;
+SELECT SUM(ABS(orderItemCountDiff)) / COUNT(1) AS '订单项目数绝对值平均数' from  sales_store_info_web_sum_all_month WHERE orderItemCountDiff is not null;
+SELECT SUM(orderItemCountDiff) / COUNT(1) AS '订单项目数直接相加平均数' from  sales_store_info_web_sum_all_month WHERE orderItemCountDiff is not null;
+
+SELECT SUM(orderCountDiff) / COUNT(1) AS '订单数正数平均数' from  sales_store_info_web_sum_all_month WHERE orderCountDiff >= 0;
+SELECT SUM(orderCountDiff) / COUNT(1) AS '订单数负数平均数' from  sales_store_info_web_sum_all_month WHERE orderCountDiff < 0;
+SELECT SUM(ABS(orderCountDiff)) / COUNT(1) AS '订单数绝对值平均数' from  sales_store_info_web_sum_all_month WHERE orderCountDiff is not null;
+SELECT SUM(orderCountDiff) / COUNT(1) AS '订单数直接相加平均数' from  sales_store_info_web_sum_all_month WHERE orderCountDiff is not null;
+
+SELECT SUM(cnPriceAmountDiff) / COUNT(1) AS '订单均价正数平均数' from  sales_store_info_web_sum_all_month WHERE cnPriceAmountDiff >= 0;
+SELECT SUM(cnPriceAmountDiff) / COUNT(1) AS '订单均价负数平均数' from  sales_store_info_web_sum_all_month WHERE cnPriceAmountDiff < 0;
+SELECT SUM(ABS(cnPriceAmountDiff)) /COUNT(1) AS '订单均价绝对值平均数' from  sales_store_info_web_sum_all_month WHERE cnPriceAmountDiff is not null;
+SELECT SUM(cnPriceAmountDiff) / COUNT(1) AS '订单均价直接相加平均数' from  sales_store_info_web_sum_all_month WHERE cnPriceAmountDiff is not null;
+
+SELECT SUM(cnSalesAmounDiff) / COUNT(1) AS '销售额正数平均数' from  sales_store_info_web_sum_all_month WHERE cnSalesAmounDiff >= 0;
+SELECT SUM(cnSalesAmounDiff) / COUNT(1) AS '销售额负数平均数' from  sales_store_info_web_sum_all_month WHERE cnSalesAmounDiff < 0;
+SELECT SUM(ABS(cnSalesAmounDiff)) /COUNT(1) AS '销售额绝对值平均数' from  sales_store_info_web_sum_all_month WHERE cnSalesAmounDiff is not null;
+SELECT SUM(cnSalesAmounDiff) / COUNT(1) AS '销售额直接相加平均数' from  sales_store_info_web_sum_all_month WHERE cnSalesAmounDiff is not null;
+
+
+-- 中位数
+SELECT COUNT(1) from  sales_store_info_web_sum_all_month WHERE orderCountDiff is not null ORDER BY orderCountDiff;
+SELECT COUNT(1) from  sales_store_info_web_sum_all_month WHERE cnSalesAmounDiff is not null ORDER BY cnSalesAmounDiff;
+
+
+SELECT
+    AVG( unitCountDiff ) AS '订单单元数误差中位数'
+FROM
+    ( SELECT unitCountDiff, @INDEX := @INDEX + 1 myIndex FROM sales_store_info_web_sum_all_month, ( SELECT @INDEX := 0 ) a
+      WHERE
+          unitCountDiff is not null ORDER BY unitCountDiff
+    ) b
+WHERE
+        FLOOR( @INDEX / 2+1 ) = myIndex
+   OR CEIL( @INDEX / 2 ) = myIndex;
+
+
+SELECT
+    AVG( orderItemCountDiff ) AS '订单项目数误差中位数'
+FROM
+    ( SELECT orderItemCountDiff, @INDEX := @INDEX + 1 myIndex FROM sales_store_info_web_sum_all_month, ( SELECT @INDEX := 0 ) a
+      WHERE
+          orderItemCountDiff is not null ORDER BY orderItemCountDiff
+    ) b
+WHERE
+        FLOOR( @INDEX / 2+1 ) = myIndex
+   OR CEIL( @INDEX / 2 ) = myIndex;
+
+
+SELECT
+    AVG( orderCountDiff ) AS '订单数误差中位数'
+FROM
+    ( SELECT orderCountDiff, @INDEX := @INDEX + 1 myIndex FROM sales_store_info_web_sum_all_month, ( SELECT @INDEX := 0 ) a
+      WHERE
+          orderCountDiff is not null ORDER BY orderCountDiff
+    ) b
+WHERE
+        FLOOR( @INDEX / 2+1 ) = myIndex
+   OR CEIL( @INDEX / 2 ) = myIndex;
+
+
+SELECT
+    AVG( cnPriceAmountDiff ) AS '订单均价误差中位数'
+FROM
+    ( SELECT cnPriceAmountDiff, @INDEX := @INDEX + 1 myIndex FROM sales_store_info_web_sum_all_month, ( SELECT @INDEX := 0 ) a
+      WHERE
+          cnPriceAmountDiff is not null ORDER BY cnPriceAmountDiff
+    ) b
+WHERE
+        FLOOR( @INDEX / 2+1 ) = myIndex
+   OR CEIL( @INDEX / 2 ) = myIndex;
+
+
+SELECT
+    AVG( cnSalesAmounDiff ) AS '销售额误差中位数'
+FROM
+    ( SELECT cnSalesAmounDiff, @INDEX := @INDEX + 1 myIndex FROM sales_store_info_web_sum_all_month, ( SELECT @INDEX := 0 ) a
+      WHERE
+          cnSalesAmounDiff is not null ORDER BY cnSalesAmounDiff
+    ) b
+WHERE
+        FLOOR( @INDEX / 2+1 ) = myIndex
+   OR CEIL( @INDEX / 2 ) = myIndex;

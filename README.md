@@ -1,2 +1,1 @@
-# spapi
-amozon
+#SP-API
